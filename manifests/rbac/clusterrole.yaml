@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vs-admin-role
+rules:
+- apiGroups:
+  - erizzardi.mine.io
+  resources:
+  - vaultsecrets
+  verbs:
+  - list
+  - watch
