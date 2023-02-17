@@ -1,0 +1,14 @@
+apiVersion: erizzardi.mine.io/v1alpha1
+kind: VaultSecret
+metadata:
+  name: vaultsecret-test
+spec:
+  secretEngine: operator-engine
+  secretPath: secretpath-test
+  data:
+    - name: secret1
+      value: ciaociaociao
+    - name: secret2
+      value: provaprova
+    - name: secret3
+      value: '{"ciao":"prova"}'
