@@ -5,6 +5,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -20,6 +22,7 @@ import (
 	clientset_v1alpha1 "github.com/erizzardi/vault-secrets-operator/api/clientset/v1alpha1"
 	"github.com/erizzardi/vault-secrets-operator/api/types/v1alpha1"
 	"github.com/erizzardi/vault-secrets-operator/pkg/config"
+	"github.com/erizzardi/vault-secrets-operator/pkg/vault"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -50,12 +53,24 @@ func main() {
 	}
 
 	// Vault configuration
-	client, err := api.NewClient(&api.Config{Address: cfg.VaultUrl, HttpClient: httpClient})
+	vaultClient, err := api.NewClient(&api.Config{
+		Address:    cfg.VaultUrl,
+		HttpClient: httpClient,
+		// Backoff: func(min time.Duration, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+		// },
+		// CheckRetry: func(ctx context.Context, resp *http.Response, err error) (bool, error) {
+		// },
+
+	})
 	if err != nil {
 		panic(err)
 	}
-	client.SetToken(cfg.VaultToken)
+	// Add other authentication methods
+	vaultClient.SetToken(cfg.VaultToken)
 
+	// ==========================
+	// Kubernetes configuration
+	// ==========================
 	// Init Kubernetes configuration
 	// k8sCfg, err := rest.InClusterConfig()
 	// if err != nil {
@@ -74,83 +89,61 @@ func main() {
 	// Register type definition
 	v1alpha1.AddToScheme(scheme.Scheme)
 
+	// ===========================
+	// Define and run controller
+	// ===========================
 	stopCh := make(chan struct{})
-	bc := make(chan bool)
-	_, controller := vaultSecretsController(v1AlphaClientSet, "", bc, logger, ctx)
+	bc := make(chan error)
+	_, controller := vaultSecretsController(v1AlphaClientSet, "", bc, logger, vaultClient, ctx)
 	// Start controller
 	go controller.Run(stopCh)
 
 	for {
-		if !<-bc {
+		// This handles all the non-handed errors, i.e. the critical ones
+		// ATM there are none, but improve in the future
+		if <-bc != nil {
 			close(stopCh)
 			break
 		}
 		time.Sleep(1 * time.Second)
 	}
-
-	// count := 0
-	// for {
-	// 	time.Sleep(1 * time.Second)
-	// 	if count == 5 {
-	// 		<-stopCh
-	// 		break
-	// 	}
-	// 	count++
-	// }
-
-	// // Reconciliation loop
-	// prevIterVsList := v1alpha1.VaultSecretList{}
-	// for {
-	// 	// List all VaultSecrets
-	// 	vsList := store.List()
-
-	// 	// If there are new resources
-
-	// 	for k, vs := range vsList {
-	// 		secret := make(map[string]interface{})
-	// 		// mountPath := vs.(*v1alpha1.VaultSecret).Spec.MountPath
-	// 		// secretPath := vs.(*v1alpha1.VaultSecret).Spec.SecretPath
-	// 		data := vs.(*v1alpha1.VaultSecret).Spec.Data
-
-	// 		// Build JSON from Data
-	// 		for _, m := range data {
-	// 			if json.Valid([]byte(m.Value)) {
-	// 				if err := json.Unmarshal([]byte(m.Value), &secret); err != nil {
-	// 					panic(err)
-	// 				}
-	// 			} else {
-	// 				secret[m.Name] = m.Value
-	// 			}
-	// 		}
-	// 		// Create new secret version in Vault
-	// 		// Copy current list in older iteration
-	// 		vs.(*v1alpha1.VaultSecret).DeepCopyInto(&prevIterVsList.Items[k])
-	// 	}
-	// }
-
 }
 
 // watchResources leverages the Informer type to poll the k8s api and get the status of the VaultSecrets resources
-func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, namespace string, bc chan bool, logger *log.Logger, ctx context.Context) (cache.Store, cache.Controller) {
+func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, namespace string, bc chan error, logger *log.Logger, client *api.Client, ctx context.Context) (cache.Store, cache.Controller) {
 	store, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (result runtime.Object, err error) {
-				return clientSet.VaultSecrets(namespace).List(lo, ctx)
+				res, err := clientSet.VaultSecrets(namespace).List(lo, ctx)
+				if err != nil {
+					logger.Errorf("Error unmarshaling object: %s", err.Error())
+					return &v1alpha1.VaultSecretList{}, err
+				}
+				return res, nil
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
-				return clientSet.VaultSecrets(namespace).Watch(lo, ctx)
+				res, err := clientSet.VaultSecrets(namespace).Watch(lo, ctx)
+				if err != nil {
+					logger.Errorf("Error creating Watch for resource: %s", err.Error())
+					return res, err
+				}
+				return res, nil
 			},
 		},
 		&v1alpha1.VaultSecret{},
 		60*time.Second,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				logger.Debugf("Write secret %s into Vault", obj.(*v1alpha1.VaultSecret).Name)
-				bc <- true
+				if err := addFunc(obj.(*v1alpha1.VaultSecret), client, logger, ctx); err != nil {
+					logger.Errorf("Error: %s", err.Error())
+				}
+				bc <- nil
 			},
 			DeleteFunc: func(obj interface{}) {
-				fmt.Printf("Object deleted: %s\n", obj.(*v1alpha1.VaultSecret).Name)
-				bc <- false
+				if err := deleteFunc(obj.(*v1alpha1.VaultSecret), client, logger, ctx); err != nil {
+					logger.Error("Error: %s", err.Error())
+				}
+				bc <- nil
 			},
 			UpdateFunc: func(obj interface{}, newObj interface{}) {
 				fmt.Printf("Object updated: %s\n", obj.(*v1alpha1.VaultSecret).Name)
@@ -158,6 +151,36 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 		},
 	)
 	return store, controller
+}
+
+func addFunc(vs *v1alpha1.VaultSecret, client *api.Client, logger *log.Logger, ctx context.Context) error {
+	logger.Debugf("Write secret %s into Vault", vs.Name)
+	// Build JSON from Data
+	secret := make(map[string]interface{})
+	for _, m := range vs.Spec.Data {
+		if json.Valid([]byte(m.Value)) {
+			if err := json.Unmarshal([]byte(m.Value), &secret); err != nil {
+				return errors.New("cannot unmarshal secret data into structure: " + err.Error())
+			}
+		} else {
+			secret[m.Name] = m.Value
+		}
+	}
+	// There's no error from WriteSecret that can stop the controller
+	_, err := vault.WriteSecret(vs.Spec.SecretEngine, vs.Spec.SecretPath, secret, client, ctx)
+	if err != nil {
+		return errors.New("cannot write secret to Vault: " + err.Error())
+	}
+	logger.Infof("Written secret %s/%s/%s into Vault", vs.Spec.SecretEngine, vs.Spec.SecretPath, vs.Name)
+	return nil
+}
+
+func deleteFunc(vs *v1alpha1.VaultSecret, client *api.Client, logger *log.Logger, ctx context.Context) error {
+	if err := vault.DeleteSecret(vs.Spec.SecretEngine, vs.Spec.SecretPath, client, ctx); err != nil {
+		return err
+	}
+	logger.Infof("Deleted secret %s/%s/%s from Vault", vs.Spec.SecretEngine, vs.Spec.SecretPath, vs.Name)
+	return nil
 }
 
 // // REMEMBER THIS for testing
