@@ -11,4 +11,4 @@ vault:
   enabled: true
   dev:
     enabled: true
-    devRootToken: root
+    devRootToken: myroot

@@ -3,7 +3,7 @@ kind: VaultSecret
 metadata:
   name: vaultsecret-test
 spec:
-  secretEngine: operator-engine
+  mountPath: operator-engine
   secretPath: secretpath-test
   data:
     - name: secret1

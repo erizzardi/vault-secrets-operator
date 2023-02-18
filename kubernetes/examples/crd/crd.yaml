@@ -13,10 +13,10 @@ spec:
           type: object
           properties:
             spec:
-              required: ["data", "secretEngine", "secretPath"]
+              required: ["data", "mountPath", "secretPath"]
               type: object
               properties:
-                secretEngine:
+                mountPath:
                   type: string
                 secretPath:
                   type: string
