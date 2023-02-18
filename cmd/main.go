@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -55,7 +56,9 @@ func main() {
 		logger.Panicf("Panic: invalid configuration: %s", err.Error())
 	}
 
+	// =====================
 	// Vault configuration
+	// =====================
 	vaultClient, err := api.NewClient(&api.Config{
 		Address:    cfg.VaultUrl,
 		HttpClient: httpClient,
@@ -74,14 +77,17 @@ func main() {
 	// ==========================
 	// Kubernetes configuration
 	// ==========================
-	// Init Kubernetes configuration
-	// k8sCfg, err := rest.InClusterConfig()
-	// if err != nil {
-	// 	log.Panic(err.Error())
-	// }
-	k8sCfg, err := clientcmd.BuildConfigFromFlags("", "/Users/erizzardi/.kube/config")
-	if err != nil {
-		logger.Panicf("Panic: cannot build Kubernetes configuration: %s", err.Error())
+	var k8sCfg *rest.Config
+	if cfg.LocalTesting {
+		k8sCfg, err = clientcmd.BuildConfigFromFlags("", cfg.Kubeconfig)
+		if err != nil {
+			logger.Panicf("Panic: cannot build Kubernetes configuration: %s", err.Error())
+		}
+	} else {
+		k8sCfg, err = rest.InClusterConfig()
+		if err != nil {
+			log.Panic(err.Error())
+		}
 	}
 
 	v1AlphaClientSet, err := clientset_v1alpha1.NewForConfig(k8sCfg)
@@ -92,12 +98,14 @@ func main() {
 	// Register type definition
 	v1alpha1.AddToScheme(scheme.Scheme)
 
+	logger.Info("Controller started")
+
 	// ===========================
 	// Define and run controller
 	// ===========================
 	stopCh := make(chan struct{})
 	bc := make(chan error)
-	_, controller := vaultSecretsController(v1AlphaClientSet, "", bc, logger, vaultClient, ctx)
+	_, controller := vaultSecretsController(v1AlphaClientSet, "", cfg.ResyncPeriod, bc, logger, vaultClient, ctx)
 	// Start controller
 	go controller.Run(stopCh)
 
@@ -108,12 +116,12 @@ func main() {
 			close(stopCh)
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(cfg.LoopPeriod) * time.Second)
 	}
 }
 
 // watchResources leverages the Informer type to poll the k8s api and get the status of the VaultSecrets resources
-func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, namespace string, bc chan error, logger *log.Logger, client *api.Client, ctx context.Context) (cache.Store, cache.Controller) {
+func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, namespace string, resyncPeriod int, bc chan error, logger *log.Logger, client *api.Client, ctx context.Context) (cache.Store, cache.Controller) {
 	store, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (result runtime.Object, err error) {
@@ -134,7 +142,7 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 			},
 		},
 		&v1alpha1.VaultSecret{},
-		60*time.Second,
+		time.Duration(resyncPeriod)*time.Second,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				vs := obj.(*v1alpha1.VaultSecret)
@@ -154,7 +162,6 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 				bc <- nil
 			},
 			UpdateFunc: func(obj interface{}, newObj interface{}) {
-				// fmt.Printf("Object updated: %s\n", obj.(*v1alpha1.VaultSecret).Name)
 				if err := updateFunc(obj.(*v1alpha1.VaultSecret), clientSet, client, logger, ctx); err != nil {
 					logger.Errorf("Error at object update: %s", err.Error())
 				}
