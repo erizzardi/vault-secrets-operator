@@ -1,5 +1,6 @@
 operator:
   resources: {}
+  extraEnvs: {}
 
 image:
   registry: docker.io

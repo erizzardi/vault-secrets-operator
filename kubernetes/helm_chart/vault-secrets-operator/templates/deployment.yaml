@@ -9,7 +9,6 @@ spec:
   selector:
     matchLabels:
       app: {{ .Release.Name }}
-  strategy: {}
   template:
     metadata:
       labels:
@@ -22,6 +21,7 @@ spec:
         resources: {{ .Values.operator.resources }}
         env:
         - name: VAULT_URL
-          value: {{ .Values.vault.url }}
+          value: {{- printf "%s-%s" .Release.Name "vault" | trunc 63 | trimSuffix "-" -}}
         - name: VAULT_TOKEN
           value: {{ .Values.vault.dev.devRootToken }}
+        {{ .values.operator.extraEnvs }}
