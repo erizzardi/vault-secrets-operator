@@ -66,13 +66,13 @@ func TestGetNonExistingSecret(t *testing.T) {
 		t.Error(err.Error())
 	}
 	if _, err := GetSecretVersioned(mountPath, secretPath, 999, vClient, ctx); err == nil {
-		t.Error("Succeeded (!) in getting non existing secret.")
+		t.Error("Succeeded (!) in getting non existing secret. Version exists")
 	}
 	if _, err := GetSecretVersioned("non-existing", secretPath, 1, vClient, ctx); err == nil {
-		t.Error("Succeeded (!) in getting non existing secret.")
+		t.Error("Succeeded (!) in getting non existing secret. MountPath exists")
 	}
 	if _, err := GetSecretVersioned(mountPath, "non-existing", 1, vClient, ctx); err == nil {
-		t.Error("Succeeded (!) in getting non existing secret.")
+		t.Error("Succeeded (!) in getting non existing secret. SecretPath exists")
 	}
 }
 
