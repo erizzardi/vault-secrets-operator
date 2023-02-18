@@ -1,8 +1,11 @@
 package config
 
-var noDefaultString = ""
+// Key for context
+type Key string
 
-// var noDefaultInt = 0
+var KeyVersion Key = "version"
+
+var noDefaultString = ""
 
 // Default values
 const (

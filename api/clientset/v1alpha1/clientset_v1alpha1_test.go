@@ -2,7 +2,7 @@ package v1alpha1
 
 import (
 	"context"
-	"flag"
+	"os"
 	"testing"
 
 	"github.com/erizzardi/vault-secrets-operator/api/types/v1alpha1"
@@ -12,9 +12,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// These tests require access to a working k8s cluster, with the VaultSecret CRD installed, and a local Vault instance. Specify the kubeconfig with the --kubeconfig flag
-var kubeconfig = flag.String("kubeconfig", ".kube/config", "")
-var namespace = flag.String("namespace", "vault-secrets", "")
+// These tests require access to a working k8s cluster, with the VaultSecret CRD installed, and a local Vault instance. Specify the kubeconfig with the KUBECONFIG env var
+var kubeconfig = os.Getenv("KUBECONFIG")
+var namespace = os.Getenv("NAMESPACE")
 
 var ctx = context.TODO()
 var letters = []rune("abcdefghijklmnopqrstuvwxyz")
@@ -37,7 +37,7 @@ func TestSpecDifferent(t *testing.T) {
 }
 
 func TestCreateDeleteVS(t *testing.T) {
-	v1AlphaClientSet, err := getv1Alpha1ClientSet(*kubeconfig)
+	v1AlphaClientSet, err := getv1Alpha1ClientSet(kubeconfig)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -49,7 +49,7 @@ func TestCreateDeleteVS(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      utils.RandSeq(10, letters),
-			Namespace: *namespace,
+			Namespace: namespace,
 		},
 		Spec: v1alpha1.VaultSecretSpec{
 			MountPath:  "unit-tests-mount-path",
@@ -60,7 +60,7 @@ func TestCreateDeleteVS(t *testing.T) {
 			},
 		},
 	}
-	res, err := v1AlphaClientSet.VaultSecrets(*namespace).Create(&vs, ctx)
+	res, err := v1AlphaClientSet.VaultSecrets(namespace).Create(&vs, ctx)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -70,25 +70,25 @@ func TestCreateDeleteVS(t *testing.T) {
 	}
 
 	// Delete the vaultsecret
-	if err = v1AlphaClientSet.VaultSecrets(*namespace).Delete(vs.Name, v1.DeleteOptions{}, ctx); err != nil {
+	if err = v1AlphaClientSet.VaultSecrets(namespace).Delete(vs.Name, v1.DeleteOptions{}, ctx); err != nil {
 		t.Error(err.Error())
 	}
 }
 
 func TestDeleNonExistingVS(t *testing.T) {
-	v1AlphaClientSet, err := getv1Alpha1ClientSet(*kubeconfig)
+	v1AlphaClientSet, err := getv1Alpha1ClientSet(kubeconfig)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
 
 	// Delete non existing vaultsecret
-	if err = v1AlphaClientSet.VaultSecrets(*namespace).Delete("non-existing", v1.DeleteOptions{}, ctx); err == nil {
+	if err = v1AlphaClientSet.VaultSecrets(namespace).Delete("non-existing", v1.DeleteOptions{}, ctx); err == nil {
 		t.Error("Deleted a non existing resource!")
 	}
 }
 
 func TestWatcher(t *testing.T) {
-	v1AlphaClientSet, err := getv1Alpha1ClientSet(*kubeconfig)
+	v1AlphaClientSet, err := getv1Alpha1ClientSet(kubeconfig)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -100,7 +100,7 @@ func TestWatcher(t *testing.T) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      utils.RandSeq(10, letters),
-			Namespace: *namespace,
+			Namespace: namespace,
 		},
 		Spec: v1alpha1.VaultSecretSpec{
 			MountPath:  "unit-tests-mount-path",
@@ -111,11 +111,11 @@ func TestWatcher(t *testing.T) {
 			},
 		},
 	}
-	if _, err = v1AlphaClientSet.VaultSecrets(*namespace).Create(&vs, ctx); err != nil {
+	if _, err = v1AlphaClientSet.VaultSecrets(namespace).Create(&vs, ctx); err != nil {
 		t.Error(err.Error())
 	}
 
-	if _, err = v1AlphaClientSet.VaultSecrets(*namespace).Watch(v1.ListOptions{}, ctx); err != nil {
+	if _, err = v1AlphaClientSet.VaultSecrets(namespace).Watch(v1.ListOptions{}, ctx); err != nil {
 		t.Error(err.Error())
 	}
 }
