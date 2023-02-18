@@ -147,8 +147,8 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 			AddFunc: func(obj interface{}) {
 				vs := obj.(*v1alpha1.VaultSecret)
 				if _, ok := vs.Annotations[config.ManagedAnnotation]; !ok {
-					if err := addFunc(obj.(*v1alpha1.VaultSecret), clientSet, client, logger, ctx); err != nil {
-						logger.Errorf("Error at object creation: %s", err.Error())
+					if err := addFunc(vs, clientSet, client, logger, ctx); err != nil {
+						logger.Errorf("Error at object adding: %s", err.Error())
 					}
 				} else {
 					logger.Debugf("Skipped adding object %s", vs.Name)
@@ -156,7 +156,7 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 				bc <- nil
 			},
 			DeleteFunc: func(obj interface{}) {
-				if err := deleteFunc(obj.(*v1alpha1.VaultSecret), clientSet, client, logger, ctx); err != nil {
+				if err := deleteFunc(obj.(*v1alpha1.VaultSecret), client, logger, ctx); err != nil {
 					logger.Errorf("Error at object deletion: %s", err.Error())
 				}
 				bc <- nil
@@ -172,46 +172,52 @@ func vaultSecretsController(clientSet clientset_v1alpha1.V1Alpha1Interface, name
 	return store, controller
 }
 
+// addFunc = writeFunc + patchFunc
 func addFunc(vs *v1alpha1.VaultSecret, clientSet clientset_v1alpha1.V1Alpha1Interface, client *api.Client, logger *log.Logger, ctx context.Context) error {
+	vs, version, err := writeFunc(vs, clientSet, client, logger, ctx)
+	if err != nil {
+		return err
+	}
+	return patchFunc(vs, clientSet, version, client, logger, ctx)
+}
+
+func writeFunc(vs *v1alpha1.VaultSecret, clientSet clientset_v1alpha1.V1Alpha1Interface, client *api.Client, logger *log.Logger, ctx context.Context) (*v1alpha1.VaultSecret, int, error) {
 	logger.Debugf("Write secret %s into Vault", vs.Name)
 	// Build JSON from Data
-	secret := make(map[string]interface{})
-	for _, m := range vs.Spec.Data {
-		if json.Valid([]byte(m.Value)) {
-			if err := json.Unmarshal([]byte(m.Value), &secret); err != nil {
-				return errors.New("cannot unmarshal secret data into structure: " + err.Error())
-			}
-		} else {
-			secret[m.Name] = m.Value
-		}
+	secret, err := clientset_v1alpha1.FromDataToSecret(vs)
+	if err != nil {
+		return nil, -1, errors.New("cannot unmarshal secret data into structure: " + err.Error())
 	}
 	// There's no error from WriteSecret that can stop the controller
 	out, err := vault.WriteSecret(vs.Spec.MountPath, vs.Spec.SecretPath, secret, client, ctx)
 	if err != nil {
-		return errors.New("cannot write secret to Vault: " + err.Error())
+		return nil, -1, errors.New("cannot write secret to Vault: " + err.Error())
 	}
+	return vs, out.VersionMetadata.Version, nil
+}
+
+func patchFunc(vs *v1alpha1.VaultSecret, clientSet clientset_v1alpha1.V1Alpha1Interface, version int, client *api.Client, logger *log.Logger, ctx context.Context) error {
 	// Patch object with last-applied-configuration annotation - like kubectl, and secret version
-	vsPop := vs
 	// Remove kubectl last-applied-configuration annotation, if present
-	delete(vsPop.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
-	delete(vsPop.Annotations, config.LACAnnotation)
+	delete(vs.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
+	delete(vs.Annotations, config.LACAnnotation)
 
 	// Marshal last applied configuration, and encode it in base64
-	lacByte, err := json.Marshal(vsPop)
+	lacByte, err := json.Marshal(vs)
 	if err != nil {
 		return err
 	}
 	lacb64 := base64.StdEncoding.EncodeToString(lacByte)
-	patchString := fmt.Sprintf("{\"metadata\":{\"annotations\":{\"%s\":\"%s\",\"%s\":\"true\",\"%s\":\"%d\"}}}", config.LACAnnotation, lacb64, config.ManagedAnnotation, config.SecretVersionAnnotation, out.VersionMetadata.Version)
+	patchString := fmt.Sprintf("{\"metadata\":{\"annotations\":{\"%s\":\"%s\",\"%s\":\"true\",\"%s\":\"%d\"}}}", config.LACAnnotation, lacb64, config.ManagedAnnotation, config.SecretVersionAnnotation, version)
 	logger.Debugf("Patching object %s with patch %s", vs.Name, patchString)
 	if err := clientSet.VaultSecrets(vs.Namespace).Patch(vs.Name, types.MergePatchType, []byte(patchString), metav1.PatchOptions{}, ctx); err != nil {
 		return err
 	}
-	logger.Infof("Written secret %s/%s version %d into Vault", vs.Spec.MountPath, vs.Spec.SecretPath, out.VersionMetadata.Version)
+	logger.Infof("Written secret %s/%s version %d into Vault", vs.Spec.MountPath, vs.Spec.SecretPath, version)
 	return nil
 }
 
-func deleteFunc(vs *v1alpha1.VaultSecret, clientSet clientset_v1alpha1.V1Alpha1Interface, client *api.Client, logger *log.Logger, ctx context.Context) error {
+func deleteFunc(vs *v1alpha1.VaultSecret, client *api.Client, logger *log.Logger, ctx context.Context) error {
 	version, err := strconv.Atoi(vs.Annotations[config.SecretVersionAnnotation])
 	if err != nil {
 		return err
