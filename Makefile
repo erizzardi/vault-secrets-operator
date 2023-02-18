@@ -1,4 +1,4 @@
-DOCKER_USERNAME ?= erizzardi.mine.io
+REGISTRY_NAME ?= erizzardi.mine.io
 APPLICATION_NAME ?= vault-secrets-operator
 VERSION ?= latest
 
@@ -12,13 +12,28 @@ VAULT_TOKEN ?= root
 KUBECONFIG ?= .kube/config
 NAMESPACE ?= vault-secrets
  
-image:
-	docker build -t ${DOCKER_USERNAME}/${APPLICATION_NAME}:${VERSION} -f ${DOCKERFILE_PATH} .
+push: 
+	docker push ${REGISTRY_NAME}/${APPLICATION_NAME}:${VERSION}
 
-test: clean
+image: test
+	@echo
+	@echo
+	@echo Building image
+	@echo ===============================================
+	docker build -t ${REGISTRY_NAME}/${APPLICATION_NAME}:${VERSION} -f ${DOCKERFILE_PATH} .
+
+
+test: clean-test
+	@echo
+	@echo 
+	@echo Executing unit tests
+	@echo ===============================================
 	VAULT_URL=${VAULT_URL} VAULT_TOKEN=${VAULT_TOKEN} KUBECONFIG=${KUBECONFIG} NAMESPACE=${NAMESPACE} go test ./...
+	
 
-clean:
+clean-test:
+	@echo
+	@echo 
+	@echo Cleaning test cache
+	@echo ===============================================
 	go clean -testcache
-
-all: test image
