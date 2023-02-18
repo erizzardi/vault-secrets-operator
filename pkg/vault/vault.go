@@ -7,9 +7,6 @@ import (
 )
 
 func WriteSecret(mountPath string, secretPath string, inputData map[string]interface{}, client *api.Client, ctx context.Context) (*api.KVSecret, error) {
-
-	// fmt.Println(inputData)
-
 	res, err := client.KVv2(mountPath).Put(ctx, secretPath, inputData)
 	if err != nil {
 		return nil, err

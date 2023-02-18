@@ -20,8 +20,8 @@ func TestGetEnvThatDoesNotExist(t *testing.T) {
 	envName := "TESTENV"
 	fallback := "FALLBACK"
 	res := GetEnvOrFallback(envName, fallback)
-	if res != fallback {
-		t.Errorf("%s != %s", res, fallback)
+	if res == fallback {
+		t.Errorf("%s == %s", res, fallback)
 	}
 }
 

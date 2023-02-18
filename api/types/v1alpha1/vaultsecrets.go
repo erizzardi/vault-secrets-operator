@@ -28,11 +28,9 @@ type VaultSecretList struct {
 }
 
 func dataEqual(a, b []VaultSecretSpecData) bool {
-	for _, da := range a {
-		for _, db := range b {
-			if equal := da.Name == db.Name && da.Value == db.Value; !equal {
-				return equal
-			}
+	for key, da := range a {
+		if equal := da.Name == b[key].Name && da.Value == b[key].Value; !equal {
+			return equal
 		}
 	}
 	return true

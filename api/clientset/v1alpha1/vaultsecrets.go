@@ -18,7 +18,7 @@ type VaultSecretInterface interface {
 	Get(name string, options metav1.GetOptions, ctx context.Context) (*v1alpha1.VaultSecret, error)
 	Create(vs *v1alpha1.VaultSecret, ctx context.Context) (*v1alpha1.VaultSecret, error)
 	Watch(opts metav1.ListOptions, ctx context.Context) (watch.Interface, error)
-	Delete(name string, opts metav1.ListOptions, ctx context.Context) error
+	Delete(name string, opts metav1.DeleteOptions, ctx context.Context) error
 	Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, ctx context.Context, subresources ...string) error
 }
 
@@ -77,10 +77,12 @@ func (c *vaultSecretClient) Watch(opts metav1.ListOptions, ctx context.Context) 
 		Watch(ctx)
 }
 
-func (c *vaultSecretClient) Delete(name string, opts metav1.ListOptions, ctx context.Context) error {
+func (c *vaultSecretClient) Delete(name string, opts metav1.DeleteOptions, ctx context.Context) error {
 	return c.restClient.
 		Delete().
 		Namespace(c.ns).
+		Resource("vaultsecrets").
+		Name(name).
 		Body(&opts).
 		Do(ctx).
 		Error()

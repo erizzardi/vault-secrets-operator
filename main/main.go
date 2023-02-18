@@ -219,7 +219,7 @@ func deleteFunc(vs *v1alpha1.VaultSecret, clientSet clientset_v1alpha1.V1Alpha1I
 	if err := vault.DeleteSecretVersioned(vs.Spec.MountPath, vs.Spec.SecretPath, version, client, ctx); err != nil {
 		return err
 	}
-	logger.Infof("Deleted secret %s/%s/%s version %s from Vault", vs.Spec.MountPath, version, vs.Spec.SecretPath, vs.Name)
+	logger.Infof("Deleted secret %s/%d/%s version %s from Vault", vs.Spec.MountPath, version, vs.Spec.SecretPath, vs.Name)
 	return nil
 }
 
