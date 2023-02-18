@@ -9,4 +9,4 @@ FROM scratch
 
 WORKDIR /vault-secrets-operator
 COPY --from=builder /vault-secrets-operator/operator.out .
-CMD ["./operator"]
+CMD ["./operator.out"]
