@@ -30,6 +30,12 @@ func (c Config) ValidateConfiguration() error {
 	if c.VaultToken == noDefaultString {
 		return errors.New("Vault token not set")
 	}
+	if c.LoopPeriod < 0 {
+		return errors.New("negative values for loop-period not allowed")
+	}
+	if c.ResyncPeriod < 0 {
+		return errors.New("negative values for resync-period not allowed")
+	}
 	return nil
 }
 
