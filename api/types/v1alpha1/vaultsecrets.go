@@ -8,7 +8,7 @@ type VaultSecretSpecData struct {
 }
 
 type VaultSecretSpec struct {
-	MountPath  string                `json:"secretEngine"`
+	MountPath  string                `json:"mountPath"`
 	SecretPath string                `json:"secretPath"`
 	Data       []VaultSecretSpecData `json:"data"`
 }
