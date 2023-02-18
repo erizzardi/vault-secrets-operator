@@ -1,0 +1,9 @@
+name: vault-secrets-operator
+version: 0.1.0
+apiVersion: v2
+appVersion: 0.1.0
+dependencies:
+  - name: vault
+    condition: vault.enabled
+    repository: https://helm.releases.hashicorp.com
+    version: 0.23.x

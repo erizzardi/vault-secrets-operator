@@ -8,7 +8,7 @@ GOOS ?= linux
 GOARCH ?= amd64
 
 VAULT_URL ?= http://localhost:8200
-VAULT_TOKEN ?= myroot
+VAULT_TOKEN ?= root
 KUBECONFIG ?= .kube/config
 NAMESPACE ?= vault-secrets
  

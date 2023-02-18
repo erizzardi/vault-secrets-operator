@@ -1,0 +1,13 @@
+operator:
+  resources: {}
+
+image:
+  registry: docker.io
+  name: vault-secrets-operator
+  pullPolicy: IfNotPresent
+
+vault:
+  enabled: true
+  dev:
+    enabled: true
+    devRootToken: root

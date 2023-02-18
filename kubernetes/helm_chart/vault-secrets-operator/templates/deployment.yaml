@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: {{ .Values.image.registry }}/{{ .Values.controller.image.name }}
+        name: vault-secrets-operator
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources: {{ .Values.operator.resources }}
+        env:
+        - name: VAULT_URL
+          value: {{ .Values.vault.url }}
+        - name: VAULT_TOKEN
+          value: {{ .Values.vault.dev.devRootToken }}
