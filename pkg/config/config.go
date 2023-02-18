@@ -28,7 +28,7 @@ type Config struct {
 
 func (c Config) ValidateConfiguration() error {
 	if c.VaultToken == noDefaultString {
-		return errors.New("Vault token not set")
+		return errors.New("token not set")
 	}
 	if c.LoopPeriod < 0 {
 		return errors.New("negative values for loop-period not allowed")
