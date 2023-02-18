@@ -56,13 +56,22 @@ spec:
   secretPath: secretpath-test
   data:
     - name: secret1
-      value: ciaociaosss
+      value: foo
     - name: secret2
-      value: provaprova
+      value: bar
     - name: secret3
-      value: '{"ciao":"prova"}'
+      value: '{"foo":"bar"}'
 ```
-The section `spec.data` contains the body of the secrets, that is going to be written at the path identified by `mountPath` and `secretPath` (**N.B.** at the moment the operator supports **only** KVv2 secret engines). When the operator detects a new `VaultSecret`, it reads the definition of the object and writes a secret into Vault, according to the object's manifest. If a `VaultSecret` is patched/updated, the operator checks whether there are differences with the current configuration and the latest applied (read from the `erizzardi.mine.io/last-applied-configuration` annotation), and if so it writes into Vault a new version of the secret. If an object is deleted, the operator deletes from Vault the version of the secret associated with the deleted resource. 
+The section `spec.data` contains the body of the secrets, that is going to be written at the path identified by `mountPath` and `secretPath` (**N.B.** at the moment the operator supports **only** KVv2 secret engines). The above resource's data will be written into Vault under the name `operator-engine:secretpath-test` in the form
+```json
+{
+    "secret1": "foo",
+	"secret2": "bar",
+	"foo": "bar"
+}
+```
+
+When the operator detects a new `VaultSecret`, it reads the definition of the object and writes a secret into Vault, according to the object's manifest. If a `VaultSecret` is patched/updated, the operator checks whether there are differences with the current configuration and the latest applied (read from the `erizzardi.mine.io/last-applied-configuration` annotation), and if so it writes into Vault a new version of the secret. If an object is deleted, the operator deletes from Vault the version of the secret associated with the deleted resource. 
 
 ## Configuration
 
