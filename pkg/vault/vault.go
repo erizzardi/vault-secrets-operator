@@ -6,11 +6,11 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-func WriteSecret(secretEngine string, secretPath string, inputData map[string]interface{}, client *api.Client, ctx context.Context) (*api.KVSecret, error) {
+func WriteSecret(mountPath string, secretPath string, inputData map[string]interface{}, client *api.Client, ctx context.Context) (*api.KVSecret, error) {
 
 	// fmt.Println(inputData)
 
-	res, err := client.KVv2(secretEngine).Put(ctx, secretPath, inputData)
+	res, err := client.KVv2(mountPath).Put(ctx, secretPath, inputData)
 	if err != nil {
 		return nil, err
 	}
@@ -18,11 +18,10 @@ func WriteSecret(secretEngine string, secretPath string, inputData map[string]in
 	return res, nil
 }
 
-func DeleteSecret(secretEngine string, secretPath string, client *api.Client, ctx context.Context) error {
+func DeleteSecret(mountPath string, secretPath string, client *api.Client, ctx context.Context) error {
+	return client.KVv2(mountPath).Delete(ctx, secretPath)
+}
 
-	err := client.KVv2(secretEngine).Delete(ctx, secretPath)
-	if err != nil {
-		return err
-	}
-	return nil
+func DeleteSecretVersioned(mountPath string, secretPath string, version int, client *api.Client, ctx context.Context) error {
+	return client.KVv2(mountPath).DeleteVersions(ctx, secretPath, []int{version})
 }

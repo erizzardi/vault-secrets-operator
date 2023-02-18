@@ -7,7 +7,7 @@ spec:
   secretPath: secretpath-test
   data:
     - name: secret1
-      value: ciaociaociao
+      value: ciaociaosss
     - name: secret2
       value: provaprova
     - name: secret3

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -12,13 +13,13 @@ import (
 	"github.com/erizzardi/vault-secrets-operator/api/types/v1alpha1"
 )
 
-// I need only List and Watch, but whatever
 type VaultSecretInterface interface {
 	List(opts metav1.ListOptions, ctx context.Context) (*v1alpha1.VaultSecretList, error)
 	Get(name string, options metav1.GetOptions, ctx context.Context) (*v1alpha1.VaultSecret, error)
 	Create(vs *v1alpha1.VaultSecret, ctx context.Context) (*v1alpha1.VaultSecret, error)
 	Watch(opts metav1.ListOptions, ctx context.Context) (watch.Interface, error)
 	Delete(name string, opts metav1.ListOptions, ctx context.Context) error
+	Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, ctx context.Context, subresources ...string) error
 }
 
 type vaultSecretClient struct {
@@ -83,4 +84,19 @@ func (c *vaultSecretClient) Delete(name string, opts metav1.ListOptions, ctx con
 		Body(&opts).
 		Do(ctx).
 		Error()
+}
+
+func (c *vaultSecretClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, ctx context.Context, subresources ...string) error {
+	result := &v1alpha1.VaultSecret{}
+	err := c.restClient.
+		Patch(pt).
+		Namespace(c.ns).
+		Resource("vaultsecrets").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return err
 }

@@ -8,9 +8,9 @@ type VaultSecretSpecData struct {
 }
 
 type VaultSecretSpec struct {
-	SecretEngine string                `json:"secretEngine"`
-	SecretPath   string                `json:"secretPath"`
-	Data         []VaultSecretSpecData `json:"data"`
+	MountPath  string                `json:"secretEngine"`
+	SecretPath string                `json:"secretPath"`
+	Data       []VaultSecretSpecData `json:"data"`
 }
 
 type VaultSecret struct {
@@ -25,4 +25,21 @@ type VaultSecretList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []VaultSecret `json:"items"`
+}
+
+func dataEqual(a, b []VaultSecretSpecData) bool {
+	for _, da := range a {
+		for _, db := range b {
+			if equal := da.Name == db.Name && da.Value == db.Value; !equal {
+				return equal
+			}
+		}
+	}
+	return true
+}
+
+func SpecEqual(a, b VaultSecretSpec) bool {
+	return a.MountPath == b.MountPath &&
+		a.SecretPath == b.SecretPath &&
+		dataEqual(a.Data, b.Data)
 }

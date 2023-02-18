@@ -1,12 +1,13 @@
 package v1alpha1
 
 import (
+	"github.com/erizzardi/vault-secrets-operator/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const GroupName = "erizzardi.mine.io"
+const GroupName = config.GroupName
 const GroupVersion = "v1alpha1"
 
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}

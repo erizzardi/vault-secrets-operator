@@ -8,9 +8,9 @@ func (vs *VaultSecret) DeepCopyInto(out *VaultSecret) {
 	out.TypeMeta = vs.TypeMeta
 	out.ObjectMeta = vs.ObjectMeta
 	out.Spec = VaultSecretSpec{
-		SecretEngine: vs.Spec.SecretEngine,
-		SecretPath:   vs.Spec.SecretPath,
-		Data:         vs.Spec.Data,
+		MountPath:  vs.Spec.MountPath,
+		SecretPath: vs.Spec.SecretPath,
+		Data:       vs.Spec.Data,
 	}
 }
 
