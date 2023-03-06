@@ -43,7 +43,7 @@ func main() {
 	//===============================================================
 	cfg, err := config.GetConfigOrDie()
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	// Define context
